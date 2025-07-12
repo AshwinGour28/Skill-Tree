@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Upload,
   FileText,
@@ -14,24 +14,75 @@ import {
   Settings,
   BarChart3,
   Calendar,
-  Zap
+  Zap,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [file, setFile] = useState(null);
-  const [targetRole, setTargetRole] = useState('');
+  const [skills, setSkills] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      alert('Please login first');
+      navigate('/login');
+    }
+  }, [navigate]);
 
   const handleFileUpload = (event) => {
     const uploadedFile = event.target.files?.[0];
     if (uploadedFile) {
       setFile(uploadedFile);
+      setSkills([]);
+      setError('');
     }
   };
 
-  const handleGenerateRoadmap = () => {
-    if (file && targetRole) {
-      console.log('Generating roadmap for:', targetRole, 'with file:', file.name);
+  const extractSkills = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      alert('Unauthorized. Please login again.');
+      navigate('/login');
+      return;
+    }
+
+    if (!file) {
+      setError('Please upload a resume first.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setSkills([]);
+
+    const formData = new FormData();
+    formData.append('docx', file);
+
+    try {
+      const response = await fetch('http://localhost:3000/api/scan/extract-text', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setSkills(data.skill || []);
+      } else {
+        setError(data.error || 'Skill extraction failed');
+      }
+    } catch (err) {
+      setError('Failed to connect to backend');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -45,7 +96,7 @@ const Dashboard = () => {
       children: [
         { skill: 'Pandas', level: 'Beginner', progress: 40, timeEstimate: '1 week' },
         { skill: 'FastAPI', level: 'Beginner', progress: 20, timeEstimate: '2 weeks' },
-      ]
+      ],
     },
     {
       skill: 'SQL',
@@ -56,7 +107,7 @@ const Dashboard = () => {
       children: [
         { skill: 'PostgreSQL', level: 'Intermediate', progress: 60, timeEstimate: '1 week' },
         { skill: 'Query Optimization', level: 'Beginner', progress: 10, timeEstimate: '2 weeks' },
-      ]
+      ],
     },
     {
       skill: 'Docker',
@@ -67,8 +118,15 @@ const Dashboard = () => {
       children: [
         { skill: 'Docker Compose', level: 'Beginner', progress: 0, timeEstimate: '1 week' },
         { skill: 'Kubernetes', level: 'Beginner', progress: 0, timeEstimate: '4 weeks' },
-      ]
+      ],
     },
+  ];
+
+  const tabs = [
+    { id: 'overview', label: 'Overview', icon: BarChart3 },
+    { id: 'roadmap', label: 'My Roadmap', icon: Target },
+    { id: 'progress', label: 'Progress', icon: TrendingUp },
+    { id: 'resources', label: 'Resources', icon: BookOpen },
   ];
 
   return (
@@ -79,62 +137,32 @@ const Dashboard = () => {
           <p className="text-slate-600 mt-2">Track your learning progress and manage your career roadmap</p>
         </div>
 
-        {/* Tabs */}
-        <div className="mb-8">
-          <div className="border-b border-slate-200">
-            <nav className="-mb-px flex space-x-8">
-              {[
-                { id: 'overview', label: 'Overview', icon: BarChart3 },
-                { id: 'roadmap', label: 'My Roadmap', icon: Target },
-                { id: 'progress', label: 'Progress', icon: TrendingUp },
-                { id: 'resources', label: 'Resources', icon: BookOpen },
-              ].map((tab) => {
-                const Icon = tab.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm ${
-                      activeTab === tab.id
-                        ? 'border-emerald-500 text-emerald-600'
-                        : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                    } transition-colors`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span>{tab.label}</span>
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
+        {/* Tabs Navigation */}
+        <div className="mb-8 border-b border-slate-200">
+          <nav className="-mb-px flex space-x-8">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm ${
+                    activeTab === tab.id
+                      ? 'border-emerald-500 text-emerald-600'
+                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                  } transition-colors`}
+                >
+                  <Icon className="h-4 w-4" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </nav>
         </div>
 
         {/* Overview Tab */}
         {activeTab === 'overview' && (
           <div className="space-y-8">
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              {[
-                { title: 'Skills in Progress', count: 8, icon: <Brain className="h-6 w-6 text-blue-600" />, bg: 'bg-blue-100' },
-                { title: 'Completed', count: 12, icon: <CheckCircle className="h-6 w-6 text-green-600" />, bg: 'bg-green-100' },
-                { title: 'Hours Logged', count: 124, icon: <Clock className="h-6 w-6 text-purple-600" />, bg: 'bg-purple-100' },
-                { title: 'Streak', count: '15 days', icon: <Zap className="h-6 w-6 text-orange-600" />, bg: 'bg-orange-100' },
-              ].map((card, i) => (
-                <div key={i} className="bg-white p-6 rounded-lg shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-slate-600">{card.title}</p>
-                      <p className="text-2xl font-semibold text-slate-900">{card.count}</p>
-                    </div>
-                    <div className={`h-12 w-12 ${card.bg} rounded-lg flex items-center justify-center`}>
-                      {card.icon}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Upload Section */}
             <div className="bg-white p-8 rounded-lg shadow-sm">
               <h2 className="text-xl font-semibold text-slate-900 mb-6">Generate New Roadmap</h2>
               <div className="space-y-6">
@@ -170,28 +198,32 @@ const Dashboard = () => {
                   </div>
                 </div>
 
-                {/* Target Role */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Target Role
-                  </label>
-                  <input
-                    type="text"
-                    value={targetRole}
-                    onChange={(e) => setTargetRole(e.target.value)}
-                    placeholder="e.g., Data Engineer, Full Stack Developer"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  />
+                <div className="flex justify-end">
+                  <button
+                    onClick={extractSkills}
+                    disabled={!file || loading}
+                    className={`px-4 py-2 rounded-lg font-medium text-white ${
+                      !file || loading
+                        ? 'bg-emerald-300 cursor-not-allowed'
+                        : 'bg-emerald-600 hover:bg-emerald-700'
+                    }`}
+                  >
+                    {loading ? 'Extracting...' : 'Extract Skills'}
+                  </button>
                 </div>
 
-                {/* Generate Button */}
-                <button
-                  onClick={handleGenerateRoadmap}
-                  disabled={!file || !targetRole}
-                  className="w-full bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 disabled:bg-slate-400 disabled:cursor-not-allowed transition-colors font-medium"
-                >
-                  Generate AI Roadmap
-                </button>
+                {skills.length > 0 && (
+                  <div className="bg-slate-100 p-4 rounded-lg border border-slate-300">
+                    <p className="text-sm font-semibold text-slate-800 mb-2">Extracted Skills:</p>
+                    <ul className="list-disc list-inside space-y-1 text-slate-700">
+                      {skills.map((skill, idx) => (
+                        <li key={idx}>{skill}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
               </div>
             </div>
           </div>
@@ -205,60 +237,58 @@ const Dashboard = () => {
               <p className="text-slate-600">Based on your current skills and target role</p>
             </div>
 
-            <div className="space-y-4">
-              {sampleRoadmapData.map((skill, index) => (
-                <div key={index} className="bg-white p-6 rounded-lg shadow-sm">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-                        <Brain className="h-5 w-5 text-emerald-600" />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-slate-900">{skill.skill}</h3>
-                        <p className="text-sm text-slate-500">{skill.level} • {skill.timeEstimate}</p>
-                      </div>
+            {sampleRoadmapData.map((skill, index) => (
+              <div key={index} className="bg-white p-6 rounded-lg shadow-sm space-y-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                      <Brain className="h-5 w-5 text-emerald-600" />
                     </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-slate-700">{skill.progress}%</p>
-                        <p className="text-xs text-slate-500">{skill.resources} resources</p>
-                      </div>
-                      <div className="w-20 bg-slate-200 rounded-full h-2">
-                        <div
-                          className="bg-emerald-600 h-2 rounded-full"
-                          style={{ width: `${skill.progress}%` }}
-                        ></div>
-                      </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-slate-900">{skill.skill}</h3>
+                      <p className="text-sm text-slate-500">{skill.level} • {skill.timeEstimate}</p>
                     </div>
                   </div>
-
-                  <div className="ml-6 space-y-2">
-                    {skill.children.map((child, childIndex) => (
-                      <div key={childIndex} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                            <Target className="h-4 w-4 text-blue-600" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-slate-900">{child.skill}</p>
-                            <p className="text-xs text-slate-500">{child.level} • {child.timeEstimate}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-3">
-                          <p className="text-sm font-medium text-slate-700">{child.progress}%</p>
-                          <div className="w-16 bg-slate-200 rounded-full h-2">
-                            <div
-                              className="bg-blue-600 h-2 rounded-full"
-                              style={{ width: `${child.progress}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="flex items-center space-x-4">
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-slate-700">{skill.progress}%</p>
+                      <p className="text-xs text-slate-500">{skill.resources} resources</p>
+                    </div>
+                    <div className="w-20 bg-slate-200 rounded-full h-2">
+                      <div
+                        className="bg-emerald-600 h-2 rounded-full"
+                        style={{ width: `${skill.progress}%` }}
+                      ></div>
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
+
+                <div className="ml-6 space-y-2">
+                  {skill.children.map((child, childIndex) => (
+                    <div key={childIndex} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                          <Target className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">{child.skill}</p>
+                          <p className="text-xs text-slate-500">{child.level} • {child.timeEstimate}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <p className="text-sm font-medium text-slate-700">{child.progress}%</p>
+                        <div className="w-16 bg-slate-200 rounded-full h-2">
+                          <div
+                            className="bg-blue-600 h-2 rounded-full"
+                            style={{ width: `${child.progress}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
@@ -314,10 +344,15 @@ const Dashboard = () => {
                   { title: 'Docker Deep Dive', type: 'Video', duration: '2 hours', rating: 4.7 },
                   { title: 'FastAPI Tutorial', type: 'Course', duration: '4 hours', rating: 4.6 },
                 ].map((resource, index) => (
-                  <div key={index} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-shadow">
+                  <div
+                    key={index}
+                    className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-shadow"
+                  >
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-sm font-medium text-slate-900">{resource.title}</h4>
-                      <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-1 rounded">{resource.type}</span>
+                      <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-1 rounded">
+                        {resource.type}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between text-xs text-slate-500">
                       <span>{resource.duration}</span>
