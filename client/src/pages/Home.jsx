@@ -24,9 +24,9 @@ const Home = () => {
         <div className="relative max-w-7xl mx-auto">
           <div className="text-center">
             <h1 className="text-4xl md:text-6xl font-bold text-slate-900 mb-6 leading-tight">
-              AI-Powered Career
+              Plan, Progress,
               <span className="bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text text-transparent">
-                {' '}Roadmaps
+                {' '} Succeed
               </span>
             </h1>
             <p className="text-xl text-slate-600 mb-8 max-w-3xl mx-auto leading-relaxed">
